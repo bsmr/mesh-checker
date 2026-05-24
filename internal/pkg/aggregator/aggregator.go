@@ -82,6 +82,13 @@ func (a *Aggregator) Aggregate(ctx context.Context) MeshView {
 	return mv
 }
 
+// LocalView returns this node's own observed view without any peer
+// fan-out. Used by the inter-host /api/peer/status handler where
+// recursive aggregation would cause a request storm.
+func (a *Aggregator) LocalView() ObserverView {
+	return a.localView()
+}
+
 func (a *Aggregator) localView() ObserverView {
 	v := ObserverView{Host: a.localHost, Reachable: true, Samples: map[string]map[probe.Protocol]Sample{}}
 	for _, k := range a.store.Keys() {

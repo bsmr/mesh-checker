@@ -41,15 +41,16 @@ func runServe(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 		return err
 	}
 
+	if err := config.CheckMode(*cfgPath); err != nil {
+		return fmt.Errorf("serve: %w", err)
+	}
+
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
 		return err
 	}
 	if _, err := config.ValidateWithWarnings(cfg); err != nil {
 		return err
-	}
-	if err := config.CheckMode(*cfgPath); err != nil {
-		slog.Warn("serve: config permissions", "err", err)
 	}
 
 	logger := slog.New(slog.NewJSONHandler(stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -66,6 +67,14 @@ func runServe(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 	hostTLSCert, err := tls.LoadX509KeyPair(cfg.PKI.HostCertPath, cfg.PKI.HostKeyPath)
 	if err != nil {
 		return fmt.Errorf("serve: load host cert: %w", err)
+	}
+	leaf, err := x509.ParseCertificate(hostTLSCert.Certificate[0])
+	if err != nil {
+		return fmt.Errorf("serve: parse host cert leaf: %w", err)
+	}
+	if leaf.Subject.CommonName != cfg.Host.Name {
+		return fmt.Errorf("serve: host.name %q does not match host cert CN %q",
+			cfg.Host.Name, leaf.Subject.CommonName)
 	}
 
 	udpSecret, err := base64.StdEncoding.DecodeString(cfg.Probe.UDPSharedSecret)
@@ -105,7 +114,7 @@ func runServe(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 
 	ihMux := interhost.NewMux(interhost.Deps{
 		MeshCA: caPool, HostCert: hostTLSCert, Peers: peerNames,
-		FetchLocal: func() aggregator.ObserverView { return agg.Aggregate(context.Background()).Observers[cfg.Host.Name] },
+		FetchLocal: func() aggregator.ObserverView { return agg.LocalView() },
 	})
 	ihServer := &http.Server{Addr: cfg.Listeners.InterHost.Addr, Handler: ihMux, TLSConfig: interhost.ServerTLSConfig(hostTLSCert, caPool)}
 
