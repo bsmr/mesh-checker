@@ -1,22 +1,19 @@
-// Package version exposes the build's semantic version, embedded from
-// the repo-root VERSION file so the binary and the file cannot drift.
+// Package version exposes the build's semantic version, injected at
+// build time via -ldflags so the binary and the repo-root VERSION file
+// cannot drift.
 //
-// The VERSION file in this directory is kept in sync with the repo-root
-// VERSION via go generate. Run `go generate ./internal/pkg/version/` after
-// updating the root VERSION file.
+// Build with:
 //
-//go:generate cp ../../../VERSION VERSION
+//	go build -ldflags "-X github.com/bsmr/mesh-checker/internal/pkg/version.version=$(cat VERSION)" -o bin/mesh-checker ./cmd/mesh-checker
+//
+// When built without -ldflags (e.g. plain `go test`), String returns "dev".
 package version
 
-import (
-	_ "embed"
-	"strings"
-)
+// version is overridden at build time by -ldflags -X.
+var version = "dev"
 
-//go:embed VERSION
-var versionFile string
-
-// String returns the trimmed version, e.g. "0.1.0".
+// String returns the build-time version, e.g. "0.1.0", or "dev" for
+// unstamped builds.
 func String() string {
-	return strings.TrimSpace(versionFile)
+	return version
 }
