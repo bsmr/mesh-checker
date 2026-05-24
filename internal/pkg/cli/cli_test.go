@@ -1,9 +1,10 @@
-package main
+package cli
 
 import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,7 +14,7 @@ import (
 func TestRunWithoutPeersReturnsErrNoPeers(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	err := run(context.Background(), nil, &stdout, &stderr)
+	err := Run(context.Background(), nil, &stdout, &stderr)
 
 	if !errors.Is(err, checker.ErrNoPeers) {
 		t.Fatalf("got %v, want ErrNoPeers", err)
@@ -26,7 +27,7 @@ func TestRunWithoutPeersReturnsErrNoPeers(t *testing.T) {
 func TestRunParsesCommaSeparatedPeers(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	err := run(context.Background(), []string{"-peers", "10.0.0.1, 10.0.0.2 ,10.0.0.3"}, &stdout, &stderr)
+	err := Run(context.Background(), []string{"-peers", "10.0.0.1, 10.0.0.2 ,10.0.0.3"}, &stdout, &stderr)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v (stderr=%q)", err, stderr.String())
@@ -36,7 +37,7 @@ func TestRunParsesCommaSeparatedPeers(t *testing.T) {
 func TestRunReturnsErrorOnUnknownFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	err := run(context.Background(), []string{"-nonexistent"}, &stdout, &stderr)
+	err := Run(context.Background(), []string{"-nonexistent"}, &stdout, &stderr)
 
 	if err == nil {
 		t.Fatal("expected error for unknown flag, got nil")
@@ -55,20 +56,8 @@ func TestSplitPeersTrimsAndFiltersEmpty(t *testing.T) {
 	}
 	for in, want := range cases {
 		got := splitPeers(in)
-		if !equalStrings(got, want) {
+		if !slices.Equal(got, want) {
 			t.Errorf("splitPeers(%q) = %v, want %v", in, got, want)
 		}
 	}
-}
-
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
