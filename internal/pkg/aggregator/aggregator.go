@@ -9,6 +9,7 @@ import (
 
 	"github.com/bsmr/mesh-checker/internal/pkg/classifier"
 	"github.com/bsmr/mesh-checker/internal/pkg/probe"
+	"github.com/bsmr/mesh-checker/internal/pkg/recoverwrap"
 	"github.com/bsmr/mesh-checker/internal/pkg/store"
 )
 
@@ -61,9 +62,8 @@ func (a *Aggregator) Aggregate(ctx context.Context) MeshView {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, p := range a.peers {
-		p := p
 		wg.Add(1)
-		go func() {
+		recoverwrap.Go("aggregator.fetch", func() {
 			defer wg.Done()
 			peerCtx, cancel := context.WithTimeout(ctx, a.timeout)
 			defer cancel()
@@ -76,7 +76,7 @@ func (a *Aggregator) Aggregate(ctx context.Context) MeshView {
 			}
 			v.Reachable = true
 			mv.Observers[p] = v
-		}()
+		})
 	}
 	wg.Wait()
 	return mv

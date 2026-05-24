@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bsmr/mesh-checker/internal/pkg/probe"
+	"github.com/bsmr/mesh-checker/internal/pkg/recoverwrap"
 	"github.com/bsmr/mesh-checker/internal/pkg/store"
 )
 
@@ -50,19 +51,18 @@ func (s *Scheduler) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	for i := 0; i < s.cfg.Workers; i++ {
 		wg.Add(1)
-		go func() {
+		recoverwrap.Go("scheduler.worker", func() {
 			defer wg.Done()
 			s.worker(ctx, jobs)
-		}()
+		})
 	}
 	var tickerWG sync.WaitGroup
 	for _, j := range s.jobs {
-		j := j
 		tickerWG.Add(1)
-		go func() {
+		recoverwrap.Go("scheduler.ticker", func() {
 			defer tickerWG.Done()
 			s.tickerLoop(ctx, j, jobs)
-		}()
+		})
 	}
 	tickerWG.Wait()
 	close(jobs)

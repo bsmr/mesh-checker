@@ -17,6 +17,7 @@ import (
 	"golang.org/x/net/ipv4"
 
 	"github.com/bsmr/mesh-checker/internal/pkg/probe"
+	"github.com/bsmr/mesh-checker/internal/pkg/recoverwrap"
 )
 
 func buildEcho(id, seq int, payload []byte) ([]byte, error) {
@@ -67,7 +68,7 @@ func New(timeout time.Duration) (*Prober, error) {
 		pending: map[int]chan probe.Result{},
 		conn:    c,
 	}
-	go p.readLoop()
+	recoverwrap.Go("icmp.readLoop", p.readLoop)
 	return p, nil
 }
 

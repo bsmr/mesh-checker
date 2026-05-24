@@ -22,6 +22,7 @@ import (
 	icmpprobe "github.com/bsmr/mesh-checker/internal/pkg/probe/icmp"
 	tcpprobe "github.com/bsmr/mesh-checker/internal/pkg/probe/tcp"
 	udpprobe "github.com/bsmr/mesh-checker/internal/pkg/probe/udp"
+	"github.com/bsmr/mesh-checker/internal/pkg/recoverwrap"
 	"github.com/bsmr/mesh-checker/internal/pkg/scheduler"
 	"github.com/bsmr/mesh-checker/internal/pkg/server/interhost"
 	serverprobe "github.com/bsmr/mesh-checker/internal/pkg/server/probe"
@@ -136,11 +137,22 @@ func runServe(ctx context.Context, args []string, stdout, stderr io.Writer) erro
 	}
 
 	errCh := make(chan error, 4)
-	go func() { errCh <- ihServer.ListenAndServeTLS(cfg.PKI.HostCertPath, cfg.PKI.HostKeyPath) }()
-	go func() { errCh <- uiServer.ListenAndServeTLS(cfg.PKI.HostCertPath, cfg.PKI.HostKeyPath) }()
-	go func() { errCh <- probeServer.ListenAndServe() }()
-	go func() { udpEcho.Run(); errCh <- nil }()
-	go sched.Run(ctx)
+	recoverwrap.Go("listener.interhost", func() {
+		errCh <- ihServer.ListenAndServeTLS(cfg.PKI.HostCertPath, cfg.PKI.HostKeyPath)
+	})
+	recoverwrap.Go("listener.ui", func() {
+		errCh <- uiServer.ListenAndServeTLS(cfg.PKI.HostCertPath, cfg.PKI.HostKeyPath)
+	})
+	recoverwrap.Go("listener.probe", func() {
+		errCh <- probeServer.ListenAndServe()
+	})
+	recoverwrap.Go("listener.udp-echo", func() {
+		udpEcho.Run()
+		errCh <- nil
+	})
+	recoverwrap.Go("scheduler.run", func() {
+		sched.Run(ctx)
+	})
 
 	<-ctx.Done()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
