@@ -1,62 +1,64 @@
-// Package cli wires the mesh-checker command-line interface to the checker
-// service. It parses flags, assembles a checker.Config, and delegates to
-// checker.ServiceData. Kept separate from package main so the CLI can be
-// unit-tested without invoking os.Exit.
+// Package cli wires the mesh-checker subcommands. Run dispatches to a
+// handler registered by name; handlers parse their own flags. Kept
+// separate from package main so it can be tested without os.Exit.
 package cli
 
 import (
 	"context"
 	"errors"
-	"flag"
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
-	"strings"
+	"sort"
 	"syscall"
-
-	"github.com/bsmr/mesh-checker/internal/pkg/checker"
 )
 
-// Run is the CLI entry point. It installs a SIGINT/SIGTERM handler on ctx,
-// parses args, and invokes the checker service. main() should call this
-// and translate the returned error into an exit code.
+// Handler is the contract every subcommand fulfils.
+type Handler func(ctx context.Context, args []string, stdout, stderr io.Writer) error
+
+type subcommand struct {
+	name, summary string
+	run           Handler
+}
+
+var subcommands = map[string]subcommand{}
+
+// register adds a subcommand; called from init() in each subcommand file.
+func register(name, summary string, run Handler) {
+	if _, dup := subcommands[name]; dup {
+		panic("cli: duplicate subcommand " + name)
+	}
+	subcommands[name] = subcommand{name, summary, run}
+}
+
+// Run dispatches to the subcommand named by args[0].
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	fs := flag.NewFlagSet("mesh-checker", flag.ContinueOnError)
-	fs.SetOutput(stderr)
-	peersFlag := fs.String("peers", "", "comma-separated list of peer addresses to probe")
-
-	if err := fs.Parse(args); err != nil {
-		return err
+	if len(args) == 0 {
+		printUsage(stderr)
+		return errors.New("no subcommand given")
 	}
-
-	cfg := checker.Config{Peers: splitPeers(*peersFlag)}
-
-	svc := &checker.ServiceData{Stdout: stdout, Stderr: stderr}
-	if err := svc.Run(ctx, cfg); err != nil {
-		if errors.Is(err, checker.ErrNoPeers) {
-			fs.Usage()
-		}
-		return err
+	name := args[0]
+	sc, ok := subcommands[name]
+	if !ok {
+		printUsage(stderr)
+		return fmt.Errorf("unknown subcommand %q", name)
 	}
-	return nil
+	return sc.run(ctx, args[1:], stdout, stderr)
 }
 
-// splitPeers parses a comma-separated peer list, trimming whitespace and
-// dropping empty entries. Returns nil for an empty input so callers can
-// distinguish "no peers" from "empty slice".
-func splitPeers(s string) []string {
-	if s == "" {
-		return nil
+func printUsage(w io.Writer) {
+	fmt.Fprintln(w, "usage: mesh-checker <subcommand> [flags]")
+	fmt.Fprintln(w, "subcommands:")
+	names := make([]string, 0, len(subcommands))
+	for n := range subcommands {
+		names = append(names, n)
 	}
-	parts := strings.Split(s, ",")
-	out := parts[:0]
-	for _, p := range parts {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
+	sort.Strings(names)
+	for _, n := range names {
+		fmt.Fprintf(w, "  %-12s %s\n", n, subcommands[n].summary)
 	}
-	return out
 }

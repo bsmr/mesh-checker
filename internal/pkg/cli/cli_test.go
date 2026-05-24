@@ -3,61 +3,49 @@ package cli
 import (
 	"bytes"
 	"context"
-	"errors"
-	"slices"
+	"io"
 	"strings"
 	"testing"
-
-	"github.com/bsmr/mesh-checker/internal/pkg/checker"
 )
 
-func TestRunWithoutPeersReturnsErrNoPeers(t *testing.T) {
+func TestRunWithoutSubcommandPrintsUsage(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-
 	err := Run(context.Background(), nil, &stdout, &stderr)
-
-	if !errors.Is(err, checker.ErrNoPeers) {
-		t.Fatalf("got %v, want ErrNoPeers", err)
-	}
-	if !strings.Contains(stderr.String(), "peers") {
-		t.Errorf("expected usage hint mentioning -peers on stderr, got: %q", stderr.String())
-	}
-}
-
-func TestRunParsesCommaSeparatedPeers(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-
-	err := Run(context.Background(), []string{"-peers", "10.0.0.1, 10.0.0.2 ,10.0.0.3"}, &stdout, &stderr)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v (stderr=%q)", err, stderr.String())
-	}
-}
-
-func TestRunReturnsErrorOnUnknownFlag(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-
-	err := Run(context.Background(), []string{"-nonexistent"}, &stdout, &stderr)
-
 	if err == nil {
-		t.Fatal("expected error for unknown flag, got nil")
+		t.Fatal("expected error when no subcommand given")
+	}
+	if !strings.Contains(stderr.String(), "subcommand") {
+		t.Errorf("expected usage to mention 'subcommand', got %q", stderr.String())
 	}
 }
 
-func TestSplitPeersTrimsAndFiltersEmpty(t *testing.T) {
-	cases := map[string][]string{
-		"":                   nil,
-		"a":                  {"a"},
-		"a,b,c":              {"a", "b", "c"},
-		" a , b , c ":        {"a", "b", "c"},
-		"a,,b":               {"a", "b"},
-		",,":                 nil,
-		"10.0.0.1,10.0.0.2 ": {"10.0.0.1", "10.0.0.2"},
+func TestRunUnknownSubcommandReturnsError(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	err := Run(context.Background(), []string{"frobnicate"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error for unknown subcommand")
 	}
-	for in, want := range cases {
-		got := splitPeers(in)
-		if !slices.Equal(got, want) {
-			t.Errorf("splitPeers(%q) = %v, want %v", in, got, want)
+	if !strings.Contains(err.Error(), "frobnicate") {
+		t.Errorf("error should name the unknown subcommand, got %v", err)
+	}
+}
+
+func TestRunDispatchesToRegisteredSubcommand(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	called := false
+	register("ping", "test stub", func(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+		called = true
+		if len(args) != 2 || args[0] != "-n" || args[1] != "3" {
+			t.Errorf("subcommand got wrong args: %v", args)
 		}
+		return nil
+	})
+	t.Cleanup(func() { delete(subcommands, "ping") })
+
+	if err := Run(context.Background(), []string{"ping", "-n", "3"}, &stdout, &stderr); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatal("subcommand handler was not invoked")
 	}
 }
