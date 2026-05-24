@@ -30,17 +30,24 @@ func TestRunUnknownSubcommandReturnsError(t *testing.T) {
 	}
 }
 
+// registerForTest registers a subcommand for the duration of a test.
+// Tests run sequentially in this package, so map mutation is safe.
+func registerForTest(t *testing.T, name, summary string, run Handler) {
+	t.Helper()
+	register(name, summary, run)
+	t.Cleanup(func() { delete(subcommands, name) })
+}
+
 func TestRunDispatchesToRegisteredSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	called := false
-	register("ping", "test stub", func(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	registerForTest(t, "ping", "test stub", func(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 		called = true
 		if len(args) != 2 || args[0] != "-n" || args[1] != "3" {
 			t.Errorf("subcommand got wrong args: %v", args)
 		}
 		return nil
 	})
-	t.Cleanup(func() { delete(subcommands, "ping") })
 
 	if err := Run(context.Background(), []string{"ping", "-n", "3"}, &stdout, &stderr); err != nil {
 		t.Fatalf("unexpected error: %v", err)

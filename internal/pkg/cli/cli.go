@@ -18,18 +18,20 @@ import (
 type Handler func(ctx context.Context, args []string, stdout, stderr io.Writer) error
 
 type subcommand struct {
-	name, summary string
-	run           Handler
+	summary string
+	run     Handler
 }
 
 var subcommands = map[string]subcommand{}
 
-// register adds a subcommand; called from init() in each subcommand file.
+// register adds a subcommand to the dispatcher. It MUST only be called
+// from package-level init() functions. Calling it concurrently with
+// Run, or after program startup, is a data race on the subcommands map.
 func register(name, summary string, run Handler) {
 	if _, dup := subcommands[name]; dup {
 		panic("cli: duplicate subcommand " + name)
 	}
-	subcommands[name] = subcommand{name, summary, run}
+	subcommands[name] = subcommand{summary, run}
 }
 
 // Run dispatches to the subcommand named by args[0].
