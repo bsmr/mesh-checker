@@ -3,8 +3,8 @@ package udp
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/bsmr/mesh-checker/internal/pkg/probe"
@@ -40,7 +40,7 @@ func (p *Prober) Probe(ctx context.Context, target probe.Target) (probe.Result, 
 		r.Err = err.Error()
 		return r, nil
 	}
-	addr := fmt.Sprintf("%s:%d", target.Addr, target.UDPPort)
+	addr := net.JoinHostPort(target.Addr, strconv.Itoa(target.UDPPort))
 	conn, err := net.Dial("udp", addr)
 	if err != nil {
 		r.Err = err.Error()

@@ -3,8 +3,8 @@ package tcp
 
 import (
 	"context"
-	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/bsmr/mesh-checker/internal/pkg/probe"
@@ -21,7 +21,7 @@ func (p *Prober) Probe(ctx context.Context, target probe.Target) (probe.Result, 
 	ctx, cancel := context.WithTimeout(ctx, p.Timeout)
 	defer cancel()
 	d := net.Dialer{}
-	addr := fmt.Sprintf("%s:%d", target.Addr, target.TCPPort)
+	addr := net.JoinHostPort(target.Addr, strconv.Itoa(target.TCPPort))
 	conn, err := d.DialContext(ctx, "tcp", addr)
 	r := probe.Result{Timestamp: start, Latency: time.Since(start)}
 	if err != nil {
