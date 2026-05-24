@@ -306,6 +306,7 @@ type Result struct {
 
 - **CA key handling**: `pki init` writes the CA private key to `pki.caKeyPath` (mode `0600`). The daemon never reads it. If the admin loses it, new hosts can't be enrolled — accepted limitation for 0.1.0 (regenerate the mesh).
 - **Clock skew**: UDP HMAC has a 30 s timestamp window; this requires NTP on all hosts. Not enforced, documented in README only.
+- **Uniform inter-host port**: the daemon and the `status` CLI build peer URLs as `https://<peer.addr>:<own inter-host port>`. Every peer in the mesh must therefore listen on the same `listeners.interhost.addr` port. No per-peer port field in 0.1.0; deferred to 0.2.0 (`peers[].interHostPort`). Documented in README "Caveats".
 - **IPv6**: out of scope, but `listeners.*.addr` accepts IPv6 syntax syntactically; behaviour with IPv6 peers is undefined in 0.1.0.
 - **`govulncheck` cadence**: not yet decided where it runs (pre-commit hook vs. CI only). Picked up by the implementation plan.
 - **Documentation**: README, install instructions, and `man mesh-checker` are part of the implementation plan, not this design.

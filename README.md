@@ -107,6 +107,13 @@ full schema and security model.
   daemon falls back silently (ICMP checks become permanent failures).
 - All hosts must share a reasonably accurate clock (NTP) — the UDP HMAC
   rejects timestamps more than 30 s skewed.
+- **Uniform inter-host port across the mesh**: every peer must listen on
+  the same `listeners.interhost.addr` port. Each daemon constructs the
+  URL to a peer's inter-host API as `https://<peer.addr>:<my own
+  inter-host port>`. There is no per-peer port field in 0.1.0. If you
+  need peers on different ports, run them behind a reverse proxy that
+  normalises the port — or wait for 0.2.0, which is expected to add
+  `peers[].interHostPort`.
 
 ## License
 
