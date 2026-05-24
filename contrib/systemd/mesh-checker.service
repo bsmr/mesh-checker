@@ -1,0 +1,25 @@
+[Unit]
+Description=mesh-checker daemon
+Documentation=https://git.nebula.muehmer.eu/bsmr/mesh-checker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mesh-checker
+Group=mesh-checker
+ExecStart=/usr/bin/mesh-checker serve --config /etc/mesh-checker/config.json
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/var/lib/mesh-checker
+ReadOnlyPaths=/etc/mesh-checker
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
